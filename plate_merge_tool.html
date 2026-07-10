@@ -1,0 +1,462 @@
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14171c;
+    --panel-2: #191d23;
+    --border: #262b33;
+    --text: #e8eaed;
+    --muted: #8a919e;
+    --accent: #ff7a45;
+    --accent-dim: #7a3c22;
+    --teal: #4fd1c5;
+    --error: #ff6b6b;
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  .app {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100%;
+    padding: 48px 20px 64px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .shell {
+    width: 100%;
+    max-width: 640px;
+  }
+
+  .eyebrow {
+    color: var(--accent);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 8px;
+  }
+
+  .sub {
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.6;
+    margin: 0 0 28px;
+    max-width: 54ch;
+  }
+
+  /* signature: stacked plates collapsing into one */
+  .stack {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 46px;
+    margin-bottom: 32px;
+  }
+  .stack .bar {
+    width: 34px;
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--border);
+    border-bottom: 2px solid var(--accent-dim);
+    border-radius: 3px 3px 1px 1px;
+    position: relative;
+    animation: settle 2.4s ease-in-out infinite;
+  }
+  .stack .bar span {
+    position: absolute;
+    bottom: 4px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 9px;
+    color: var(--muted);
+  }
+  .stack .bar:nth-child(1) { height: 46px; animation-delay: 0s; }
+  .stack .bar:nth-child(2) { height: 34px; animation-delay: .15s; }
+  .stack .bar:nth-child(3) { height: 24px; animation-delay: .3s; }
+  .stack .arrow { color: var(--muted); align-self: center; margin: 0 4px; font-size: 14px; }
+  .stack .result { height: 46px; width: 34px; background: linear-gradient(180deg, #26140b, var(--panel)); border: 1px solid var(--accent-dim); border-bottom: 2px solid var(--accent); border-radius: 3px 3px 1px 1px; position: relative; }
+  .stack .result span { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; font-size: 9px; color: var(--accent); }
+
+  @keyframes settle {
+    0%, 100% { transform: translateY(0); opacity: .85; }
+    50% { transform: translateY(-3px); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stack .bar { animation: none; }
+  }
+
+  .step {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+
+  .step-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .step-num {
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+  .step-title {
+    font-size: 13.5px;
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .dropzone {
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 22px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: rgba(255,122,69,0.05); color: var(--text); }
+  .dropzone strong { color: var(--text); }
+  input[type="file"] { display: none; }
+
+  .filerow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+    color: var(--text);
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .filerow .name { color: var(--teal); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 380px; }
+
+  .platelist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .platetag {
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 7px;
+    background: var(--panel-2);
+  }
+
+  .field-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .field-label { font-size: 13px; color: var(--text); }
+  .field-hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+  input[type="number"] {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    width: 84px;
+    padding: 8px 10px;
+    border-radius: 5px;
+    outline: none;
+  }
+  input[type="number"]:focus { border-color: var(--accent); }
+
+  button.primary {
+    width: 100%;
+    background: var(--accent);
+    color: #1a0e07;
+    border: none;
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 13.5px;
+    letter-spacing: 0.03em;
+    padding: 13px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: filter .15s, transform .05s;
+  }
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); }
+  button.primary:active:not(:disabled) { transform: translateY(1px); }
+  button.primary:disabled { background: var(--panel-2); color: var(--muted); cursor: not-allowed; border: 1px solid var(--border); }
+  button.primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .status {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 12px;
+    min-height: 16px;
+  }
+  .status.error { color: var(--error); }
+  .status.success { color: var(--teal); }
+
+  .result {
+    margin-top: 4px;
+  }
+  a.download {
+    display: block;
+    text-align: center;
+    text-decoration: none;
+    background: var(--panel-2);
+    border: 1px solid var(--teal);
+    color: var(--teal);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 12px 16px;
+    border-radius: 6px;
+    transition: background .15s;
+  }
+  a.download:hover { background: rgba(79,209,197,0.08); }
+
+  .footnote {
+    color: var(--muted);
+    font-size: 11.5px;
+    line-height: 1.6;
+    margin-top: 24px;
+    text-align: center;
+  }
+  .footnote .dot { color: var(--accent); }
+</style>
+
+<div class="app">
+  <div class="shell">
+    <p class="eyebrow">plate merge utility</p>
+    <h1>Combine 3MF print plates</h1>
+    <p class="sub">Merges every <code>plate_X.gcode</code> in a sliced <code>.gcode.3mf</code> project into a single <code>plate_1.gcode</code>, in order, with optional repeats — all in your browser.</p>
+
+    <div class="stack" aria-hidden="true">
+      <div class="bar"><span>01</span></div>
+      <div class="bar"><span>02</span></div>
+      <div class="bar"><span>03</span></div>
+      <div class="arrow">→</div>
+      <div class="result"><span>01</span></div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span class="step-num">01</span><span class="step-title">Upload project</span></div>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose a .gcode.3mf file">
+        <div>Drop a <strong>.gcode.3mf</strong> file here, or click to browse</div>
+      </div>
+      <input type="file" id="fileInput" accept=".3mf" />
+      <div class="filerow" id="fileRow" hidden>
+        <span class="name" id="fileName"></span>
+        <span id="fileSize"></span>
+      </div>
+      <div class="platelist" id="plateList" hidden></div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span class="step-num">02</span><span class="step-title">Repeats</span></div>
+      <div class="field-row">
+        <div>
+          <div class="field-label">Multiply combined plate</div>
+          <div class="field-hint">1 = no repeat, just merge</div>
+        </div>
+        <input type="number" id="reps" value="1" min="1" step="1" />
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span class="step-num">03</span><span class="step-title">Merge &amp; download</span></div>
+      <button class="primary" id="processBtn" disabled>Merge plates</button>
+      <div class="status" id="status"></div>
+      <div class="result" id="result" hidden style="margin-top:12px;">
+        <a class="download" id="downloadLink">Download merged .gcode.3mf</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function () {
+  const fileInput = document.getElementById('fileInput');
+  const dropzone = document.getElementById('dropzone');
+  const fileRow = document.getElementById('fileRow');
+  const fileNameEl = document.getElementById('fileName');
+  const fileSizeEl = document.getElementById('fileSize');
+  const plateListEl = document.getElementById('plateList');
+  const repsInput = document.getElementById('reps');
+  const processBtn = document.getElementById('processBtn');
+  const statusEl = document.getElementById('status');
+  const resultEl = document.getElementById('result');
+  const downloadLink = document.getElementById('downloadLink');
+
+  let state = null; // { file, zip, plates: [{num, path}] }
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  });
+  ['dragover', 'dragenter'].forEach(evt => {
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
+  });
+  ['dragleave', 'drop'].forEach(evt => {
+    dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove('drag'); });
+  });
+  dropzone.addEventListener('drop', (e) => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length) handleFile(e.target.files[0]);
+  });
+
+  function setStatus(msg, kind) {
+    statusEl.textContent = msg || '';
+    statusEl.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  function fmtSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  async function handleFile(file) {
+    resultEl.hidden = true;
+    plateListEl.hidden = true;
+    plateListEl.innerHTML = '';
+    processBtn.disabled = true;
+    state = null;
+
+    if (!/\.3mf$/i.test(file.name)) {
+      setStatus('That doesn\'t look like a .3mf file.', 'error');
+      return;
+    }
+
+    fileNameEl.textContent = file.name;
+    fileSizeEl.textContent = fmtSize(file.size);
+    fileRow.hidden = false;
+
+    setStatus('Reading archive…');
+    try {
+      const buffer = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(buffer);
+
+      const plateRe = /^Metadata\/(?:.*\/)?plate_(\d+)\.gcode$/i;
+      const plates = [];
+      zip.forEach((relPath, entry) => {
+        if (entry.dir) return;
+        const m = relPath.match(plateRe);
+        if (m) plates.push({ num: parseInt(m[1], 10), path: relPath });
+      });
+
+      if (plates.length === 0) {
+        setStatus('No plate_X.gcode files found inside Metadata/.', 'error');
+        return;
+      }
+
+      plates.sort((a, b) => a.num - b.num);
+      state = { file, zip, plates };
+
+      plateListEl.hidden = false;
+      plateListEl.innerHTML = plates.map(p => `<span class="platetag">plate_${p.num}.gcode</span>`).join('');
+
+      setStatus(`Found ${plates.length} plate${plates.length > 1 ? 's' : ''}. Ready to merge.`, 'success');
+      processBtn.disabled = false;
+    } catch (err) {
+      console.error(err);
+      setStatus('Could not read that file: ' + err.message, 'error');
+    }
+  }
+
+  processBtn.addEventListener('click', async () => {
+    if (!state) return;
+    processBtn.disabled = true;
+    resultEl.hidden = true;
+
+    try {
+      const { file, zip, plates } = state;
+
+      const contents = {};
+      for (let idx = 0; idx < plates.length; idx++) {
+        const p = plates[idx];
+        setStatus(`Reading plate_${p.num}.gcode (${idx + 1}/${plates.length})…`);
+        // Read as Blob, not string: skips UTF-8 decode/encode entirely and
+        // avoids JS string length limits on multi-hundred-MB gcode files.
+        contents[p.num] = await zip.file(p.path).async('blob');
+      }
+      setStatus('Merging plate contents…');
+
+      // A literal newline blob used as a separator. Blob concatenation via
+      // `new Blob([...])` is a lazy, reference-based join in the browser —
+      // it does not copy the underlying bytes — so this stays cheap however
+      // many millions of lines are inside, unlike string `+` or `.repeat()`.
+      const NL = new Blob(['\n']);
+
+      // Fold from the last plate down into plate 1, in order.
+      const nums = plates.map(p => p.num);
+      const maxNum = nums[nums.length - 1];
+      const minNum = nums[0];
+      for (let i = maxNum; i > minNum; i--) {
+        if (contents[i] === undefined) continue;
+        let prev = i - 1;
+        while (contents[prev] === undefined && prev > minNum) prev--;
+        if (contents[prev] === undefined) continue;
+        contents[prev] = new Blob([contents[prev], NL, contents[i]]);
+      }
+
+      let finalContent = contents[minNum];
+
+      const reps = Math.max(1, parseInt(repsInput.value, 10) || 1);
+      if (reps > 1) {
+        const parts = [];
+        for (let r = 0; r < reps; r++) {
+          if (r > 0) parts.push(NL);
+          parts.push(finalContent);
+        }
+        finalContent = new Blob(parts);
+      }
+
+      // Keep only the first plate file, with merged (and possibly repeated) content.
+      const keepPath = plates[0].path;
+      for (const p of plates) {
+        if (p.path !== keepPath) zip.remove(p.path);
+      }
+      zip.file(keepPath, finalContent);
+
+      setStatus('Packing archive… 0%');
+      const blob = await zip.generateAsync(
+        { type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 1 } },
+        (meta) => setStatus(`Packing archive… ${Math.round(meta.percent)}%`)
+      );
+
+      let outName = file.name.replace(/\.gcode\.3mf$/i, '_combined.gcode.3mf');
+      if (outName === file.name) outName = file.name.replace(/\.3mf$/i, '_combined.3mf');
+
+      const url = URL.createObjectURL(blob);
+      downloadLink.href = url;
+      downloadLink.download = outName;
+      downloadLink.textContent = `Download ${outName}`;
+      resultEl.hidden = false;
+
+      setStatus(`Done — merged ${plates.length} plate${plates.length > 1 ? 's' : ''}${reps > 1 ? ` × ${reps} repeat${reps > 1 ? 's' : ''}` : ''}.`, 'success');
+    } catch (err) {
+      console.error(err);
+      setStatus('Merge failed: ' + err.message, 'error');
+    } finally {
+      processBtn.disabled = false;
+    }
+  });
+})();
+</script>
