@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plate Merge Utility</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="app">
+  <div class="shell">
+    <p class="eyebrow">plate merge utility</p>
+    <h1>Combine 3MF print plates</h1>
+    <p class="sub">Merges every <code>plate_X.gcode</code> in a sliced <code>.gcode.3mf</code> project into a single <code>plate_1.gcode</code>, in order, with optional repeats — all in your browser.</p>
+
+    <div class="stack" aria-hidden="true">
+      <div class="bar"><span>01</span></div>
+      <div class="bar"><span>02</span></div>
+      <div class="bar"><span>03</span></div>
+      <div class="arrow">→</div>
+      <div class="result"><span>01</span></div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span class="step-num">01</span><span class="step-title">Upload project</span></div>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose a .gcode.3mf file">
+        <div>Drop a <strong>.gcode.3mf</strong> file here, or click to browse</div>
+      </div>
+      <input type="file" id="fileInput" accept=".3mf" />
+      <div class="filerow" id="fileRow" hidden>
+        <span class="name" id="fileName"></span>
+        <span id="fileSize"></span>
+      </div>
+    </div>
+
+    <div class="step" id="orderStep" hidden>
+      <div class="step-head"><span class="step-num">02</span><span class="step-title">Arrange &amp; select plates</span></div>
+      <p class="plate-order-hint">Drag to change merge order. Toggle off any plate you don't want included.</p>
+      <div class="plate-order" id="plateOrder"></div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span class="step-num">03</span><span class="step-title">Repeats</span></div>
+      <div class="field-row">
+        <div>
+          <div class="field-label">Multiply combined plate</div>
+          <div class="field-hint">1 = no repeat, just merge</div>
+        </div>
+        <input type="number" id="reps" value="1" min="1" step="1" />
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><span class="step-num">04</span><span class="step-title">Merge &amp; download</span></div>
+      <button class="primary" id="processBtn" disabled>Merge plates</button>
+      <div class="status" id="status"></div>
+      <div class="result" id="result" hidden style="margin-top:12px;">
+        <a class="download" id="downloadLink">Download merged .gcode.3mf</a>
+      </div>
+    </div>
+
+    <p class="footnote"><span class="dot">●</span> Processed entirely on your device. The file never leaves your computer.</p>
+  </div>
+</div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
