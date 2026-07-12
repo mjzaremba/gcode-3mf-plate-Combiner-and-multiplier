@@ -144,20 +144,108 @@
   }
   .filerow .name { color: var(--teal); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 380px; }
 
-  .platelist {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 10px;
-  }
-  .platetag {
-    font-size: 11px;
+  .plate-order-hint {
+    font-size: 11.5px;
     color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 3px 7px;
-    background: var(--panel-2);
+    margin: 10px 0 10px;
   }
+
+  .plate-order {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .plate-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 8px 10px;
+    cursor: grab;
+    transition: opacity .15s, border-color .15s, transform .1s;
+  }
+  .plate-card:active { cursor: grabbing; }
+  .plate-card.dragging { opacity: 0.4; }
+  .plate-card.drag-over { border-color: var(--accent); }
+  .plate-card.disabled { opacity: 0.45; }
+  .plate-card.disabled .plate-label { text-decoration: line-through; }
+
+  .drag-handle {
+    color: var(--muted);
+    font-size: 13px;
+    letter-spacing: -2px;
+    user-select: none;
+    padding: 0 2px;
+  }
+
+  .thumb, .thumb-ph {
+    width: 42px;
+    height: 42px;
+    border-radius: 5px;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .thumb-ph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    color: var(--muted);
+  }
+  .thumb-ph.loading { animation: pulse 1.3s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+
+  .plate-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+  }
+  .plate-order-num {
+    font-size: 10.5px;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+  .plate-label {
+    font-size: 12.5px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .toggle {
+    position: relative;
+    width: 34px;
+    height: 19px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .toggle input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    transition: background .15s, border-color .15s;
+  }
+  .toggle-track .toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: transform .15s, background .15s;
+  }
+  .toggle input:checked + .toggle-track { background: var(--accent-dim); border-color: var(--accent); }
+  .toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(15px); background: var(--accent); }
 
   .field-row {
     display: flex;
@@ -261,11 +349,16 @@
         <span class="name" id="fileName"></span>
         <span id="fileSize"></span>
       </div>
-      <div class="platelist" id="plateList" hidden></div>
+    </div>
+
+    <div class="step" id="orderStep" hidden>
+      <div class="step-head"><span class="step-num">02</span><span class="step-title">Arrange &amp; select plates</span></div>
+      <p class="plate-order-hint">Drag to change merge order. Toggle off any plate you don't want included.</p>
+      <div class="plate-order" id="plateOrder"></div>
     </div>
 
     <div class="step">
-      <div class="step-head"><span class="step-num">02</span><span class="step-title">Repeats</span></div>
+      <div class="step-head"><span class="step-num">03</span><span class="step-title">Repeats</span></div>
       <div class="field-row">
         <div>
           <div class="field-label">Multiply combined plate</div>
@@ -276,13 +369,15 @@
     </div>
 
     <div class="step">
-      <div class="step-head"><span class="step-num">03</span><span class="step-title">Merge &amp; download</span></div>
+      <div class="step-head"><span class="step-num">04</span><span class="step-title">Merge &amp; download</span></div>
       <button class="primary" id="processBtn" disabled>Merge plates</button>
       <div class="status" id="status"></div>
       <div class="result" id="result" hidden style="margin-top:12px;">
         <a class="download" id="downloadLink">Download merged .gcode.3mf</a>
       </div>
     </div>
+
+    <p class="footnote"><span class="dot">●</span> Processed entirely on your device. The file never leaves your computer.</p>
   </div>
 </div>
 
@@ -294,14 +389,17 @@
   const fileRow = document.getElementById('fileRow');
   const fileNameEl = document.getElementById('fileName');
   const fileSizeEl = document.getElementById('fileSize');
-  const plateListEl = document.getElementById('plateList');
+  const orderStep = document.getElementById('orderStep');
+  const plateOrderEl = document.getElementById('plateOrder');
   const repsInput = document.getElementById('reps');
   const processBtn = document.getElementById('processBtn');
   const statusEl = document.getElementById('status');
   const resultEl = document.getElementById('result');
   const downloadLink = document.getElementById('downloadLink');
 
-  let state = null; // { file, zip, plates: [{num, path}] }
+  // state.plates: original scan, used to find the plate_1 slot to write into.
+  // state.order: user-orderable/toggleable working list rendered as cards.
+  let state = null; // { file, zip, plates: [{num, path}], order: [{num, path, thumbPath, thumbUrl, enabled}] }
 
   dropzone.addEventListener('click', () => fileInput.click());
   dropzone.addEventListener('keydown', (e) => {
@@ -332,11 +430,19 @@
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
+  function revokeThumbUrls() {
+    if (!state || !state.order) return;
+    for (const p of state.order) {
+      if (p.thumbUrl) URL.revokeObjectURL(p.thumbUrl);
+    }
+  }
+
   async function handleFile(file) {
     resultEl.hidden = true;
-    plateListEl.hidden = true;
-    plateListEl.innerHTML = '';
+    orderStep.hidden = true;
+    plateOrderEl.innerHTML = '';
     processBtn.disabled = true;
+    revokeThumbUrls();
     state = null;
 
     if (!/\.3mf$/i.test(file.name)) {
@@ -367,17 +473,143 @@
       }
 
       plates.sort((a, b) => a.num - b.num);
-      state = { file, zip, plates };
 
-      plateListEl.hidden = false;
-      plateListEl.innerHTML = plates.map(p => `<span class="platetag">plate_${p.num}.gcode</span>`).join('');
+      // Match plate_X.png / plate_X_small.png thumbnails to plate numbers.
+      // Prefer the small preview since it's what's used as a thumbnail.
+      const thumbRe = /^Metadata\/(?:.*\/)?plate_(\d+)(_small)?\.png$/i;
+      const thumbMap = {};
+      zip.forEach((relPath, entry) => {
+        if (entry.dir) return;
+        const m = relPath.match(thumbRe);
+        if (!m) return;
+        const num = parseInt(m[1], 10);
+        thumbMap[num] = thumbMap[num] || {};
+        if (m[2]) thumbMap[num].small = relPath; else thumbMap[num].full = relPath;
+      });
 
+      const order = plates.map(p => ({
+        num: p.num,
+        path: p.path,
+        thumbPath: (thumbMap[p.num] && (thumbMap[p.num].small || thumbMap[p.num].full)) || null,
+        thumbUrl: null,
+        enabled: true,
+      }));
+
+      state = { file, zip, plates, order };
+
+      orderStep.hidden = false;
+      renderPlateOrder();
       setStatus(`Found ${plates.length} plate${plates.length > 1 ? 's' : ''}. Ready to merge.`, 'success');
       processBtn.disabled = false;
+
+      loadThumbnails();
     } catch (err) {
       console.error(err);
       setStatus('Could not read that file: ' + err.message, 'error');
     }
+  }
+
+  async function loadThumbnails() {
+    if (!state) return;
+    const { zip, order } = state;
+    for (const p of order) {
+      if (!p.thumbPath) continue;
+      try {
+        const blob = await zip.file(p.thumbPath).async('blob');
+        if (!state || state.order !== order) return; // a new file was loaded meanwhile
+        p.thumbUrl = URL.createObjectURL(blob);
+        renderPlateOrder();
+      } catch (err) {
+        // Thumbnail missing or unreadable — leave the placeholder icon in place.
+      }
+    }
+  }
+
+  function renderPlateOrder() {
+    if (!state) return;
+    plateOrderEl.innerHTML = '';
+
+    state.order.forEach((p, idx) => {
+      const card = document.createElement('div');
+      card.className = 'plate-card' + (p.enabled ? '' : ' disabled');
+      card.draggable = true;
+      card.dataset.index = String(idx);
+
+      const handle = document.createElement('span');
+      handle.className = 'drag-handle';
+      handle.textContent = '⋮⋮';
+      handle.setAttribute('aria-hidden', 'true');
+
+      let thumbEl;
+      if (p.thumbUrl) {
+        thumbEl = document.createElement('img');
+        thumbEl.className = 'thumb';
+        thumbEl.src = p.thumbUrl;
+        thumbEl.alt = `plate_${p.num} thumbnail`;
+      } else {
+        thumbEl = document.createElement('div');
+        thumbEl.className = 'thumb-ph' + (p.thumbPath ? ' loading' : '');
+        thumbEl.textContent = p.thumbPath ? '⋯' : '—';
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'plate-meta';
+      const orderNum = document.createElement('span');
+      orderNum.className = 'plate-order-num';
+      orderNum.textContent = `POSITION ${idx + 1}`;
+      const label = document.createElement('span');
+      label.className = 'plate-label';
+      label.textContent = `plate_${p.num}.gcode`;
+      meta.appendChild(orderNum);
+      meta.appendChild(label);
+
+      const toggleLabel = document.createElement('label');
+      toggleLabel.className = 'toggle';
+      toggleLabel.setAttribute('aria-label', `Include plate_${p.num}.gcode in merge`);
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = p.enabled;
+      cb.addEventListener('change', () => {
+        p.enabled = cb.checked;
+        card.classList.toggle('disabled', !p.enabled);
+      });
+      const track = document.createElement('span');
+      track.className = 'toggle-track';
+      const thumbDot = document.createElement('span');
+      thumbDot.className = 'toggle-thumb';
+      track.appendChild(thumbDot);
+      toggleLabel.appendChild(cb);
+      toggleLabel.appendChild(track);
+
+      card.appendChild(handle);
+      card.appendChild(thumbEl);
+      card.appendChild(meta);
+      card.appendChild(toggleLabel);
+
+      card.addEventListener('dragstart', (e) => {
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(idx));
+      });
+      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        card.classList.add('drag-over');
+      });
+      card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+      card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        card.classList.remove('drag-over');
+        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        const toIdx = parseInt(card.dataset.index, 10);
+        if (isNaN(fromIdx) || fromIdx === toIdx) return;
+        const [moved] = state.order.splice(fromIdx, 1);
+        state.order.splice(toIdx, 0, moved);
+        renderPlateOrder();
+      });
+
+      plateOrderEl.appendChild(card);
+    });
   }
 
   processBtn.addEventListener('click', async () => {
@@ -386,17 +618,14 @@
     resultEl.hidden = true;
 
     try {
-      const { file, zip, plates } = state;
+      const { file, zip, plates, order } = state;
 
-      const contents = {};
-      for (let idx = 0; idx < plates.length; idx++) {
-        const p = plates[idx];
-        setStatus(`Reading plate_${p.num}.gcode (${idx + 1}/${plates.length})…`);
-        // Read as Blob, not string: skips UTF-8 decode/encode entirely and
-        // avoids JS string length limits on multi-hundred-MB gcode files.
-        contents[p.num] = await zip.file(p.path).async('blob');
+      const enabled = order.filter(p => p.enabled);
+      if (enabled.length === 0) {
+        setStatus('Turn on at least one plate to merge.', 'error');
+        processBtn.disabled = false;
+        return;
       }
-      setStatus('Merging plate contents…');
 
       // A literal newline blob used as a separator. Blob concatenation via
       // `new Blob([...])` is a lazy, reference-based join in the browser —
@@ -404,32 +633,33 @@
       // many millions of lines are inside, unlike string `+` or `.repeat()`.
       const NL = new Blob(['\n']);
 
-      // Fold from the last plate down into plate 1, in order.
-      const nums = plates.map(p => p.num);
-      const maxNum = nums[nums.length - 1];
-      const minNum = nums[0];
-      for (let i = maxNum; i > minNum; i--) {
-        if (contents[i] === undefined) continue;
-        let prev = i - 1;
-        while (contents[prev] === undefined && prev > minNum) prev--;
-        if (contents[prev] === undefined) continue;
-        contents[prev] = new Blob([contents[prev], NL, contents[i]]);
+      // Read and join only the enabled plates, in the order shown on screen —
+      // no need to fold through disabled plates or force ascending order.
+      const parts = [];
+      for (let idx = 0; idx < enabled.length; idx++) {
+        const p = enabled[idx];
+        setStatus(`Reading plate_${p.num}.gcode (${idx + 1}/${enabled.length})…`);
+        if (idx > 0) parts.push(NL);
+        parts.push(await zip.file(p.path).async('blob'));
       }
-
-      let finalContent = contents[minNum];
+      setStatus('Merging plate contents…');
+      let finalContent = new Blob(parts);
 
       const reps = Math.max(1, parseInt(repsInput.value, 10) || 1);
       if (reps > 1) {
-        const parts = [];
+        const repeated = [];
         for (let r = 0; r < reps; r++) {
-          if (r > 0) parts.push(NL);
-          parts.push(finalContent);
+          if (r > 0) repeated.push(NL);
+          repeated.push(finalContent);
         }
-        finalContent = new Blob(parts);
+        finalContent = new Blob(repeated);
       }
 
-      // Keep only the first plate file, with merged (and possibly repeated) content.
-      const keepPath = plates[0].path;
+      // Write the merged result into the plate_1.gcode slot (falling back to
+      // the lowest-numbered plate if for some reason there's no plate 1),
+      // and drop every other plate_X.gcode from the archive.
+      const keepEntry = plates.find(p => p.num === 1) || plates[0];
+      const keepPath = keepEntry.path;
       for (const p of plates) {
         if (p.path !== keepPath) zip.remove(p.path);
       }
@@ -450,7 +680,7 @@
       downloadLink.textContent = `Download ${outName}`;
       resultEl.hidden = false;
 
-      setStatus(`Done — merged ${plates.length} plate${plates.length > 1 ? 's' : ''}${reps > 1 ? ` × ${reps} repeat${reps > 1 ? 's' : ''}` : ''}.`, 'success');
+      setStatus(`Done — merged ${enabled.length} plate${enabled.length > 1 ? 's' : ''}${reps > 1 ? ` × ${reps} repeat${reps > 1 ? 's' : ''}` : ''}.`, 'success');
     } catch (err) {
       console.error(err);
       setStatus('Merge failed: ' + err.message, 'error');
