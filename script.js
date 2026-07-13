@@ -7,6 +7,8 @@
   const orderStep = document.getElementById('orderStep');
   const plateOrderEl = document.getElementById('plateOrder');
   const repsInput = document.getElementById('reps');
+  const filamentSummaryEl = document.getElementById('filamentSummary');
+  const filamentValueEl = document.getElementById('filamentValue');
   const processBtn = document.getElementById('processBtn');
   const statusEl = document.getElementById('status');
   const resultEl = document.getElementById('result');
@@ -14,7 +16,7 @@
 
   // state.plates: original scan, used to find the plate_1 slot to write into.
   // state.order: user-orderable/toggleable working list rendered as cards.
-  let state = null; // { file, zip, plates: [{num, path}], order: [{num, path, thumbPath, thumbUrl, enabled}] }
+  let state = null; // { file, zip, plates: [{num, path}], order: [{num, path, thumbPath, thumbUrl, enabled, contentBlob, filamentG}] }
 
   dropzone.addEventListener('click', () => fileInput.click());
   dropzone.addEventListener('keydown', (e) => {
@@ -52,10 +54,64 @@
     }
   }
 
+  // Slicer footers write a line like "; filament used [g] = 34.07" (or a
+  // comma-separated list for multi-extruder prints) near the end of the
+  // file. Reading only the tail bytes of the blob — rather than decoding
+  // the whole multi-million-line file to text — keeps this fast regardless
+  // of plate size: Blob.slice() is a cheap byte-range view, not a copy.
+  const FILAMENT_TAIL_BYTES = 65536;
+  async function extractFilamentGrams(blob) {
+    try {
+      const start = Math.max(0, blob.size - FILAMENT_TAIL_BYTES);
+      const tailText = await blob.slice(start).text();
+      const match = tailText.match(/;\s*filament used \[g\]\s*=\s*([^\r\n]+)/i);
+      if (!match) return null;
+      const nums = match[1].split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+      if (nums.length === 0) return null;
+      return nums.reduce((a, b) => a + b, 0);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function updateFilamentSummary() {
+    if (!state) { filamentSummaryEl.hidden = true; return; }
+    const enabled = state.order.filter(p => p.enabled);
+    if (enabled.length === 0) { filamentSummaryEl.hidden = true; return; }
+
+    const stillLoading = enabled.some(p => p.filamentG === undefined);
+    const known = enabled.filter(p => typeof p.filamentG === 'number');
+    const missing = enabled.length - known.length;
+    const sum = known.reduce((a, p) => a + p.filamentG, 0);
+    const reps = Math.max(1, parseInt(repsInput.value, 10) || 1);
+    const total = sum * reps;
+
+    filamentSummaryEl.hidden = false;
+    filamentValueEl.innerHTML = '';
+    const main = document.createElement('span');
+    main.textContent = stillLoading ? '…' : `${total.toFixed(2)} g`;
+    filamentValueEl.appendChild(main);
+
+    if (!stillLoading && reps > 1) {
+      const detail = document.createElement('span');
+      detail.className = 'filament-detail';
+      detail.textContent = `(${sum.toFixed(2)} g × ${reps})`;
+      filamentValueEl.appendChild(detail);
+    }
+    if (!stillLoading && missing > 0) {
+      const warn = document.createElement('span');
+      warn.className = 'filament-warn';
+      warn.textContent = `${missing} plate${missing > 1 ? 's' : ''} missing filament data`;
+      filamentValueEl.appendChild(warn);
+    }
+  }
+  repsInput.addEventListener('input', updateFilamentSummary);
+
   async function handleFile(file) {
     resultEl.hidden = true;
     orderStep.hidden = true;
     plateOrderEl.innerHTML = '';
+    filamentSummaryEl.hidden = true;
     processBtn.disabled = true;
     revokeThumbUrls();
     state = null;
@@ -108,16 +164,20 @@
         thumbPath: (thumbMap[p.num] && (thumbMap[p.num].small || thumbMap[p.num].full)) || null,
         thumbUrl: null,
         enabled: true,
+        contentBlob: null,
+        filamentG: undefined, // undefined = not read yet, null = read but not found, number = grams
       }));
 
       state = { file, zip, plates, order };
 
       orderStep.hidden = false;
       renderPlateOrder();
+      updateFilamentSummary();
       setStatus(`Found ${plates.length} plate${plates.length > 1 ? 's' : ''}. Ready to merge.`, 'success');
       processBtn.disabled = false;
 
       loadThumbnails();
+      loadFilamentData();
     } catch (err) {
       console.error(err);
       setStatus('Could not read that file: ' + err.message, 'error');
@@ -137,6 +197,27 @@
       } catch (err) {
         // Thumbnail missing or unreadable — leave the placeholder icon in place.
       }
+    }
+  }
+
+  // Reads each plate's full content once, caches it on the plate (so the
+  // merge step below doesn't have to decompress it a second time), and
+  // pulls the filament-grams figure out of its tail.
+  async function loadFilamentData() {
+    if (!state) return;
+    const { zip, order } = state;
+    for (const p of order) {
+      try {
+        const blob = await zip.file(p.path).async('blob');
+        if (!state || state.order !== order) return; // a new file was loaded meanwhile
+        p.contentBlob = blob;
+        p.filamentG = await extractFilamentGrams(blob);
+      } catch (err) {
+        p.filamentG = null;
+      }
+      if (!state || state.order !== order) return;
+      renderPlateOrder();
+      updateFilamentSummary();
     }
   }
 
@@ -178,6 +259,19 @@
       meta.appendChild(orderNum);
       meta.appendChild(label);
 
+      const grams = document.createElement('span');
+      if (p.filamentG === undefined) {
+        grams.className = 'plate-grams unknown';
+        grams.textContent = 'reading filament use…';
+      } else if (p.filamentG === null) {
+        grams.className = 'plate-grams unknown';
+        grams.textContent = 'no filament data found';
+      } else {
+        grams.className = 'plate-grams';
+        grams.textContent = `${p.filamentG.toFixed(2)} g filament`;
+      }
+      meta.appendChild(grams);
+
       const toggleLabel = document.createElement('label');
       toggleLabel.className = 'toggle';
       toggleLabel.setAttribute('aria-label', `Include plate_${p.num}.gcode in merge`);
@@ -187,6 +281,7 @@
       cb.addEventListener('change', () => {
         p.enabled = cb.checked;
         card.classList.toggle('disabled', !p.enabled);
+        updateFilamentSummary();
       });
       const track = document.createElement('span');
       track.className = 'toggle-track';
@@ -250,12 +345,18 @@
 
       // Read and join only the enabled plates, in the order shown on screen —
       // no need to fold through disabled plates or force ascending order.
+      // Plates already read during filament-data loading reuse that cached
+      // blob instead of decompressing the archive entry a second time.
       const parts = [];
       for (let idx = 0; idx < enabled.length; idx++) {
         const p = enabled[idx];
-        setStatus(`Reading plate_${p.num}.gcode (${idx + 1}/${enabled.length})…`);
+        let blob = p.contentBlob;
+        if (!blob) {
+          setStatus(`Reading plate_${p.num}.gcode (${idx + 1}/${enabled.length})…`);
+          blob = await zip.file(p.path).async('blob');
+        }
         if (idx > 0) parts.push(NL);
-        parts.push(await zip.file(p.path).async('blob'));
+        parts.push(blob);
       }
       setStatus('Merging plate contents…');
       let finalContent = new Blob(parts);
@@ -295,7 +396,12 @@
       downloadLink.textContent = `Download ${outName}`;
       resultEl.hidden = false;
 
-      setStatus(`Done — merged ${enabled.length} plate${enabled.length > 1 ? 's' : ''}${reps > 1 ? ` × ${reps} repeat${reps > 1 ? 's' : ''}` : ''}.`, 'success');
+      const known = enabled.filter(p => typeof p.filamentG === 'number');
+      const filamentNote = known.length === enabled.length
+        ? ` — ${(known.reduce((a, p) => a + p.filamentG, 0) * reps).toFixed(2)} g filament`
+        : '';
+
+      setStatus(`Done — merged ${enabled.length} plate${enabled.length > 1 ? 's' : ''}${reps > 1 ? ` × ${reps} repeat${reps > 1 ? 's' : ''}` : ''}${filamentNote}.`, 'success');
     } catch (err) {
       console.error(err);
       setStatus('Merge failed: ' + err.message, 'error');

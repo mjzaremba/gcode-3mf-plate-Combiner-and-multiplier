@@ -5,14 +5,21 @@
     --border: #262b33;
     --text: #e8eaed;
     --muted: #8a919e;
-    --accent: #ff7a45;
-    --accent-dim: #7a3c22;
+    --accent: #16e8c0;
+    --accent-dim: #0c4a40;
     --teal: #4fd1c5;
     --error: #ff6b6b;
     --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
   }
 
   * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    min-height: 100%;
+  }
 
   .app {
     background: var(--bg);
@@ -81,7 +88,7 @@
   .stack .bar:nth-child(2) { height: 34px; animation-delay: .15s; }
   .stack .bar:nth-child(3) { height: 24px; animation-delay: .3s; }
   .stack .arrow { color: var(--muted); align-self: center; margin: 0 4px; font-size: 14px; }
-  .stack .result { height: 46px; width: 34px; background: linear-gradient(180deg, #26140b, var(--panel)); border: 1px solid var(--accent-dim); border-bottom: 2px solid var(--accent); border-radius: 3px 3px 1px 1px; position: relative; }
+  .stack .result { height: 46px; width: 34px; background: linear-gradient(180deg, #0a2420, var(--panel)); border: 1px solid var(--accent-dim); border-bottom: 2px solid var(--accent); border-radius: 3px 3px 1px 1px; position: relative; }
   .stack .result span { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; font-size: 9px; color: var(--accent); }
 
   @keyframes settle {
@@ -218,6 +225,25 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .plate-grams {
+    font-size: 11px;
+    color: var(--teal);
+  }
+  .plate-grams.unknown { color: var(--muted); font-style: italic; }
+
+  .filament-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+  }
+  .filament-label { color: var(--muted); }
+  .filament-value { color: var(--teal); font-weight: 700; font-size: 14px; }
+  .filament-value .filament-detail { color: var(--muted); font-weight: 400; font-size: 11.5px; margin-left: 6px; }
+  .filament-value .filament-warn { color: var(--accent); font-weight: 400; font-size: 11.5px; margin-left: 6px; }
 
   .toggle {
     position: relative;
@@ -271,7 +297,7 @@
   button.primary {
     width: 100%;
     background: var(--accent);
-    color: #1a0e07;
+    color: #062420;
     border: none;
     font-family: var(--mono);
     font-weight: 700;
